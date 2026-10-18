@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Virtual Try-On</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #f6f2ec;
+  --panel: #fffdfa;
+  --ink: #1d1a17;
+  --ink-2: #6b625a;
+  --line: #e4dcd2;
+  --accent: #c2410c;
+  --accent-ink: #fff;
+  --radius: 18px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font: 15px/1.5 Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+}
+[hidden] { display: none !important; }
+
+header {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px 8px;
+}
+h1 {
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.05;
+  margin: 0 0 10px;
+  letter-spacing: -0.02em;
+}
+h1 em { font-style: italic; color: var(--accent); }
+header p { margin: 0; color: var(--ink-2); max-width: 560px; }
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.25fr;
+  gap: 20px;
+  align-items: stretch;
+}
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr 1fr; }
+  .result { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  main { grid-template-columns: 1fr; }
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.step {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 22px;
+  color: var(--accent);
+}
+.card-title { font-weight: 600; }
+
+.drop {
+  position: relative;
+  flex: 1;
+  min-height: 300px;
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  background: #faf6f0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--ink-2);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color .15s, background .15s;
+}
+.drop:hover, .drop.over { border-color: var(--accent); background: #fdf1ea; }
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.drop svg { width: 34px; height: 34px; margin-bottom: 8px; stroke: currentColor; }
+.drop small { display: block; font-size: 12px; margin-top: 4px; }
+.drop img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #faf6f0;
+}
+.remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  border: none;
+  background: rgba(29,26,23,.75);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.result .frame {
+  position: relative;
+  flex: 1;
+  min-height: 380px;
+  border-radius: 12px;
+  background: #efe8de;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--ink-2);
+  text-align: center;
+  padding: 0;
+}
+.result .frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.placeholder { padding: 24px; max-width: 260px; }
+
+.loading { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 20px;
+  font: 600 15px Inter, sans-serif;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--accent-ink);
+  transition: transform .1s, opacity .15s;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  text-align: center;
+  text-decoration: none;
+}
+.actions { display: flex; gap: 10px; }
+.actions .btn { flex: 1; }
+
+.error {
+  background: #fde8e4;
+  color: #9a2c13;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Virtual <em>Try-On</em></h1>
+  <p>Upload a photo of a person and a photo of a clothing item. The AI generates a picture of that person wearing the clothes.</p>
+</header>
+
+<main>
+  <section class="card">
+    <div class="card-head"><span class="step">1</span><span class="card-title">Model photo</span></div>
+    <label class="drop" id="model-drop">
+      <input type="file" accept="image/*" id="model-input">
+      <div>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+        <div>Click or drop a photo</div>
+        <small>Front-facing, full or half body</small>
+      </div>
+    </label>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><span class="step">2</span><span class="card-title">Clothing photo</span></div>
+    <label class="drop" id="clothing-drop">
+      <input type="file" accept="image/*" id="clothing-input">
+      <div>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M8 3 3 6l2 5 2-1v11h10V10l2 1 2-5-5-3a4 4 0 0 1-8 0Z"/></svg>
+        <div>Click or drop a photo</div>
+        <small>Garment on a plain background works best</small>
+      </div>
+    </label>
+  </section>
+
+  <section class="card result">
+    <div class="card-head"><span class="step">3</span><span class="card-title">Result</span></div>
+    <div class="frame" id="frame">
+      <div class="placeholder" id="placeholder">Your try-on image appears here.</div>
+    </div>
+    <div class="error" id="error" hidden></div>
+    <div class="actions">
+      <button class="btn" id="generate" disabled>Try it on</button>
+      <a class="btn secondary" id="download" download="try-on.png" hidden>Download</a>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const images = { model: null, clothing: null };
+  const generateBtn = document.getElementById('generate');
+  const frame = document.getElementById('frame');
+  const errorBox = document.getElementById('error');
+  const downloadLink = document.getElementById('download');
+  let busy = false;
+
+  // Downscale uploads so the request stays small and fast
+  function loadResized(file, maxSize = 1024) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image.')); };
+      img.src = url;
+    });
+  }
+
+  function updateButton() {
+    generateBtn.disabled = busy || !images.model || !images.clothing;
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.hidden = !msg;
+  }
+
+  function setupDrop(key) {
+    const drop = document.getElementById(key + '-drop');
+    const input = document.getElementById(key + '-input');
+
+    async function handle(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      showError('');
+      try {
+        images[key] = await loadResized(file);
+      } catch (e) {
+        showError(e.message);
+        return;
+      }
+      drop.querySelectorAll('img, .remove').forEach(el => el.remove());
+      const img = document.createElement('img');
+      img.src = images[key];
+      img.alt = key + ' preview';
+      const remove = document.createElement('button');
+      remove.className = 'remove';
+      remove.type = 'button';
+      remove.textContent = '✕';
+      remove.title = 'Remove';
+      remove.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        images[key] = null;
+        input.value = '';
+        img.remove();
+        remove.remove();
+        updateButton();
+      });
+      drop.append(img, remove);
+      updateButton();
+    }
+
+    input.addEventListener('change', () => handle(input.files[0]));
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => handle(e.dataTransfer.files[0]));
+  }
+
+  setupDrop('model');
+  setupDrop('clothing');
+
+  generateBtn.addEventListener('click', async () => {
+    if (busy) return;
+    busy = true;
+    updateButton();
+    showError('');
+    downloadLink.hidden = true;
+    generateBtn.textContent = 'Generating…';
+    frame.innerHTML = '<div class="loading"><div class="spinner"></div><div>Dressing your model… this can take up to a minute.</div></div>';
+
+    try {
+      const res = await fetch('/api/try-on', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: images.model, clothing: images.clothing }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.image) throw new Error(data.error || 'Something went wrong. Please try again.');
+
+      const img = document.createElement('img');
+      img.src = data.image;
+      img.alt = 'Try-on result';
+      frame.replaceChildren(img);
+      downloadLink.href = data.image;
+      downloadLink.hidden = false;
+    } catch (e) {
+      frame.innerHTML = '<div class="placeholder">Your try-on image appears here.</div>';
+      showError(e.message);
+    } finally {
+      busy = false;
+      generateBtn.textContent = 'Try it on';
+      updateButton();
+    }
+  });
+})();
+</script>
+</body>
+</html>

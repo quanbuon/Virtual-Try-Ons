@@ -1,0 +1,9 @@
+{
+  "name": "virtual-try-on",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "@netlify/functions": "^4.0.0"
+  }
+}
